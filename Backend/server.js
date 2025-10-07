@@ -9,9 +9,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 import leaderboardRoutes from "./routes/leaderboardRoutes.js";
 import exportRoutes from "./routes/exportRoutes.js";
 dotenv.config();
-
+   
 const app=express();
-
 
 app.use(cors());
 app.use(express.json());
@@ -26,7 +25,7 @@ app.use("/api/export", exportRoutes);
 app.get("/",(req,res)=>{
     res.json({message:"Hello from server"});
 });
-
+ 
 // app.get("/",(req,res)=>{
 //     res.send("Hello connected");
 // }) 

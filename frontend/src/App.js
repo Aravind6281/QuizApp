@@ -1,64 +1,78 @@
 import { useEffect, useState } from "react";
 import AdminDashboard from "./components/AdminDashboard";
-import TakeQuiz from "./components/TakeQuiz";
+import QuizTake from "./components/QuizTake";
+import Leaderboard from "./components/leaderboard";
 import Login from "./components/Login";
-import Register from "./components/Register";  // ✅ Import Register
+import Register from "./components/Register";
 import axios from "axios";
 
 function App() {
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [user, setUser] = useState(null);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
   const [quizzes, setQuizzes] = useState([]);
-  const [showRegister, setShowRegister] = useState(false); // ✅ Added this state
+  const [showRegister, setShowRegister] = useState(false);
 
-  // ✅ Load saved user info from localStorage
+  // Load saved user info
   useEffect(() => {
     const saved = localStorage.getItem("userInfo");
     if (saved) setUser(JSON.parse(saved));
   }, []);
 
-  // ✅ Fetch quizzes for normal users (not admin)
+  // Fetch quizzes
   useEffect(() => {
-    if (user && user.role !== "admin") {
-      axios.get("/api/quizzes")
-        .then((res) => setQuizzes(res.data))
+    if (user && user.role !== "user") {
+      axios
+        .get("http://localhost:8000/api/quizzes")
+        .then((res) => {
+          setQuizzes(Array.isArray(res.data.quizzes) ? res.data.quizzes : []);
+        })
         .catch((err) => console.error("Error fetching quizzes:", err));
     }
   }, [user]);
-
-  // ✅ Show login or register screen
+  // Login/Register screen
+ 
   if (!user) {
     return showRegister ? (
       <Register onRegisterSuccess={() => setShowRegister(false)} />
     ) : (
       <Login setUser={setUser} setShowRegister={setShowRegister} />
     );
-    
   }
   
-  const userRole = user.role || "user"; // Default to "user" if role is undefined
+  const userRole = user.role || "user";
+  
+  // Admin dashboard
 
-  if (userRole === "admin") {
+  if (userRole === "user") {
     return <AdminDashboard user={user} />;
   }
 
-  // ✅ When user selects a quiz
-  
-  if (selectedQuiz||selectedQuiz!==null) {
+  // Show leaderboard if selected
+  if (showLeaderboard && selectedQuiz) {
     return (
-      <TakeQuiz
+      <Leaderboard
+        quizId={selectedQuiz._id}
+        onBack={() => setShowLeaderboard(false)}
+      />
+    );
+  }
+
+  // Show quiz-taking view
+  if (selectedQuiz) {
+    return (
+      <QuizTake
         quizId={selectedQuiz._id}
         onBack={() => setSelectedQuiz(null)}
       />
     );
   }
 
-  // ✅ Normal user quiz selection page
+  // Default quiz selection page
   return (
     <div style={{ textAlign: "center", marginTop: 50 }}>
       <h1>🧠 Welcome, {user.name}</h1>
       <h2>Select a Quiz</h2>
-      {/* <AdminDashboard user={user}/> */}
       {quizzes.length === 0 ? (
         <p>No quizzes available.</p>
       ) : (
@@ -71,6 +85,16 @@ function App() {
             {q.title}
           </button>
         ))
+      )}
+
+      {/* Show leaderboard button only if a quiz is selected */}
+      {selectedQuiz && (
+        <button
+          onClick={() => setShowLeaderboard(true)}
+          style={{ marginTop: 20 }}
+        >
+          View Leaderboard
+        </button>
       )}
 
       <button

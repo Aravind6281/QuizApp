@@ -8,6 +8,7 @@ function AdminDashboard({ user }) {
   const [newTitle, setNewTitle] = useState("");
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [selectedQuiz, setSelectedQuiz] = useState(null);
 
   const config = {
     headers: { Authorization: `Bearer ${user.token}` },
@@ -16,10 +17,14 @@ function AdminDashboard({ user }) {
   // Fetch analytics + quizzes
   useEffect(() => {
     const fetchData = async () => {
-      const a = await axios.get("http://localhost:8000/api/admin/analytics", config);
-      const q = await axios.get("http://localhost:8000/api/admin/quizzes", config);
-      setAnalytics(a.data);
-      setQuizzes(q.data);
+      try {
+        const a = await axios.get("http://localhost:8000/api/admin/analytics", config);
+        const q = await axios.get("http://localhost:8000/api/admin/quizzes", config);
+        setAnalytics(a.data);
+        setQuizzes(q.data);
+      } catch (err) {
+        console.error("Failed to fetch admin data", err);
+      }
     };
     fetchData();
   }, []);
@@ -27,48 +32,77 @@ function AdminDashboard({ user }) {
   // Create quiz
   const createQuiz = async () => {
     if (!newTitle.trim()) return;
-    const { data } = await axios.post("http://localhost:8000/api/admin/quizzes", { title: newTitle }, config);
-    setQuizzes([data, ...quizzes]);
-    setNewTitle("");
+    try {
+      const { data } = await axios.post(
+        "http://localhost:8000/api/admin/quizzes",
+        { title: newTitle },
+        config
+      );
+      setQuizzes([data, ...quizzes]);
+      setNewTitle("");
+    } catch (err) {
+      console.error("Failed to create quiz", err);
+    }
   };
 
   // Delete quiz
   const deleteQuiz = async (id) => {
-    if (window.confirm("Delete this quiz?")) {
+    if (!window.confirm("Delete this quiz?")) return;
+    try {
       await axios.delete(`http://localhost:8000/api/admin/quizzes/${id}`, config);
       setQuizzes(quizzes.filter((q) => q._id !== id));
+    } catch (err) {
+      console.error("Failed to delete quiz", err);
     }
   };
 
-  // Fetch leaderboard
-  const fetchLeaderboard = async () => {
-    const { data } = await axios.get("http://localhost:8000/api/admin/leaderboard", config);
-    setLeaderboard(data);
-  };
-
-  // Handle leaderboard toggle
+  // Fetch leaderboard for selected quiz
   useEffect(() => {
-    if (showLeaderboard) {
+    if (showLeaderboard && selectedQuiz) {
+      const fetchLeaderboard = async () => {
+        try {
+          const { data } = await axios.get(
+            `http://localhost:8000/api/quizzes/${selectedQuiz._id}/results`,
+            config
+          );
+          setLeaderboard(data);
+        } catch (err) {
+          console.error("Failed to fetch leaderboard", err);
+        }
+      };
       fetchLeaderboard();
     }
-  }, [showLeaderboard]);
+  }, [showLeaderboard, selectedQuiz]);
 
-  if (showLeaderboard) {
+  if (showLeaderboard && selectedQuiz) {
     return (
       <div style={{ textAlign: "center", marginTop: 50 }}>
-        <h1>🏅 Leaderboard</h1>
+        <h1>🏅 Leaderboard: {selectedQuiz.title}</h1>
         <button onClick={() => setShowLeaderboard(false)}>⬅ Back to Dashboard</button>
 
         {leaderboard.length === 0 ? (
           <p>No leaderboard data available.</p>
         ) : (
-          <ol>
-            {leaderboard.map((entry, index) => (
-              <li key={index}>
-                {entry.userName} — {entry.score} points
-              </li>
-            ))}
-          </ol>
+          <table style={{ margin: "auto", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ border: "1px solid black", padding: 5 }}>Rank</th>
+                <th style={{ border: "1px solid black", padding: 5 }}>Name</th>
+                <th style={{ border: "1px solid black", padding: 5 }}>Score</th>
+                <th style={{ border: "1px solid black", padding: 5 }}>Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboard.map((r, index) => (
+                <tr key={r._id}>
+                  <td style={{ border: "1px solid black", padding: 5 }}>{index + 1}</td>
+                  <td style={{ border: "1px solid black", padding: 5 }}>{r.user?.name || "Unknown"}</td>
+                  <td style={{ border: "1px solid black", padding: 5 }}>{r.score}</td>
+                  <td style={{ border: "1px solid black", padding: 5 }}>{r.percentage.toFixed(2)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     );
@@ -79,6 +113,7 @@ function AdminDashboard({ user }) {
       <h1>👑 Admin Dashboard</h1>
       <h3>Welcome, {user.name}</h3>
 
+      {/* Analytics */}
       <div style={{ margin: 30 }}>
         <h2>📊 Platform Analytics</h2>
         <p>Total Users: {analytics.totalUsers}</p>
@@ -103,6 +138,7 @@ function AdminDashboard({ user }) {
         </PieChart>
       </div>
 
+      {/* Quiz Management */}
       <div>
         <h2>🧩 Manage Quizzes</h2>
         <input
@@ -115,7 +151,7 @@ function AdminDashboard({ user }) {
 
         <ul>
           {quizzes.map((q) => (
-            <li key={q._id}>
+            <li key={q._id} style={{ marginBottom: 10 }}>
               {q.title}
               <button
                 onClick={() => deleteQuiz(q._id)}
@@ -123,17 +159,26 @@ function AdminDashboard({ user }) {
               >
                 🗑️
               </button>
+              <button
+                onClick={() => {
+                  setSelectedQuiz(q);
+                  setShowLeaderboard(true);
+                }}
+                style={{ marginLeft: 10 }}
+              >
+                🏅 View Leaderboard
+              </button>
             </li>
           ))}
         </ul>
       </div>
-      <div>
-  <h3>📤 Export Reports</h3>
-  <button onClick={() => window.open("http://localhost:8000/api/export/csv")}>Download CSV</button>
-  <button onClick={() => window.open("http://localhost:8000/api/export/pdf")}>Download PDF</button>
-</div>
 
-      <button onClick={() => setShowLeaderboard(true)}>🏅 View Leaderboard</button>
+      {/* Export Reports */}
+      <div>
+        <h3>📤 Export Reports</h3>
+        <button onClick={() => window.open("http://localhost:8000/api/export/csv")}>Download CSV</button>
+        <button onClick={() => window.open("http://localhost:8000/api/export/pdf")}>Download PDF</button>
+      </div>
     </div>
   );
 }

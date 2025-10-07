@@ -8,7 +8,7 @@ function TakeQuiz({ quizId, onBack }) {
   const [timeLeft, setTimeLeft] = useState(60); // 60 seconds for demo
 
   useEffect(() => {
-    axios.get(`http://localhost:8000/api/questions/${quizId}`).then(res => setQuestions(res.data));
+    axios.get(`http://localhost:8000/api/questions/${quizId}/questions`).then(res => setQuestions(res.data));
   }, [quizId]);
 
   useEffect(() => {
